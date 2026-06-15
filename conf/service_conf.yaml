@@ -13,6 +13,16 @@ mysql:
   max_connections: 900
   stale_timeout: 300
   max_allowed_packet: 1073741824
+dameng:
+  name: 'RAG_FLOW'
+  user: 'SYSDBA'
+  password: 'Dameng123456'
+  host: '172.20.142.35'
+  port: 5601
+  schema: 'SYSDBA'
+  driver: 'dmpython'
+  max_connections: 100
+  stale_timeout: 300
 minio:
   user: 'rag_flow'
   password: 'infini_rag_flow'

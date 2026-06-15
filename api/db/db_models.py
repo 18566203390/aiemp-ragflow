@@ -33,6 +33,7 @@ from playhouse.pool import PooledMySQLDatabase, PooledPostgresqlDatabase
 
 from api import utils
 from api.db import SerializedType
+from api.db.dameng_database import PooledDamengDatabase
 from api.utils.json_encode import json_dumps, json_loads
 from api.utils.configs import deserialize_b64, serialize_b64
 
@@ -50,6 +51,7 @@ class TextFieldType(Enum):
     MYSQL = "LONGTEXT"
     OCEANBASE = "LONGTEXT"
     POSTGRES = "TEXT"
+    DAMENG = "LONGTEXT"
 
 
 class LongTextField(TextField):
@@ -464,16 +466,76 @@ class RetryingPooledOceanBaseDatabase(PooledMySQLDatabase):
         return None
 
 
+class RetryingPooledDamengDatabase(PooledDamengDatabase):
+    def __init__(self, *args, **kwargs):
+        self.max_retries = kwargs.pop("max_retries", 5)
+        self.retry_delay = kwargs.pop("retry_delay", 1)
+        super().__init__(*args, **kwargs)
+
+    def execute_sql(self, sql, params=None, commit=True):
+        for attempt in range(self.max_retries + 1):
+            try:
+                return super().execute_sql(sql, params, commit)
+            except (OperationalError, InterfaceError) as e:
+                error_messages = ["connection", "closed", "broken pipe", "lost"]
+                should_retry = any(msg in str(e).lower() for msg in error_messages)
+                if should_retry and attempt < self.max_retries:
+                    logging.warning(
+                        f"Dameng connection issue (attempt {attempt+1}/{self.max_retries}): {e}"
+                    )
+                    self._handle_connection_loss()
+                    time.sleep(self.retry_delay * (2 ** attempt))
+                else:
+                    logging.error(f"Dameng execution failure: {e}")
+                    raise
+        return None
+
+    def _handle_connection_loss(self):
+        try:
+            self.close()
+        except Exception:
+            pass
+        try:
+            self.connect()
+        except Exception as e:
+            logging.error(f"Failed to reconnect to Dameng: {e}")
+            time.sleep(0.1)
+            try:
+                self.connect()
+            except Exception as e2:
+                logging.error(f"Failed to reconnect to Dameng on second attempt: {e2}")
+                raise
+
+    def begin(self):
+        for attempt in range(self.max_retries + 1):
+            try:
+                return super().begin()
+            except (OperationalError, InterfaceError) as e:
+                error_messages = ["connection", "closed", "broken pipe", "lost"]
+                should_retry = any(msg in str(e).lower() for msg in error_messages)
+                if should_retry and attempt < self.max_retries:
+                    logging.warning(
+                        f"Dameng connection lost during transaction (attempt {attempt+1}/{self.max_retries})"
+                    )
+                    self._handle_connection_loss()
+                    time.sleep(self.retry_delay * (2 ** attempt))
+                else:
+                    raise
+        return None
+
+
 class PooledDatabase(Enum):
     MYSQL = RetryingPooledMySQLDatabase
     OCEANBASE = RetryingPooledOceanBaseDatabase
     POSTGRES = RetryingPooledPostgresqlDatabase
+    DAMENG = RetryingPooledDamengDatabase
 
 
 class DatabaseMigrator(Enum):
     MYSQL = MySQLMigrator
     OCEANBASE = MySQLMigrator
     POSTGRES = PostgresqlMigrator
+    DAMENG = MySQLMigrator
 
 
 @singleton
@@ -629,10 +691,67 @@ class MysqlDatabaseLock:
         return magic
 
 
+class DamengDatabaseLock:
+    def __init__(self, lock_name, timeout=10, db=None):
+        self.lock_name = lock_name
+        self.timeout = int(timeout)
+        self.db = db if db else DB
+        self.txn = None
+
+    @with_retry(max_retries=3, retry_delay=1.0)
+    def lock(self):
+        self.db.execute_sql(
+            "CREATE TABLE IF NOT EXISTS ragflow_db_lock "
+            "(lock_name VARCHAR(128) PRIMARY KEY, update_time BIGINT)"
+        )
+        self.txn = self.db.atomic()
+        self.txn.__enter__()
+        try:
+            self.db.execute_sql(
+                "INSERT INTO ragflow_db_lock(lock_name, update_time) VALUES(?, ?)",
+                (self.lock_name, current_timestamp()),
+            )
+        except Exception:
+            pass
+        cursor = self.db.execute_sql(
+            "SELECT lock_name FROM ragflow_db_lock WHERE lock_name = ? FOR UPDATE",
+            (self.lock_name,),
+        )
+        ret = cursor.fetchone()
+        if not ret:
+            raise Exception(f"failed to acquire dameng lock {self.lock_name}")
+        return True
+
+    def unlock(self):
+        if self.txn:
+            self.txn.__exit__(None, None, None)
+            self.txn = None
+
+    def __enter__(self):
+        if isinstance(self.db, PooledDamengDatabase):
+            self.lock()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if isinstance(self.db, PooledDamengDatabase):
+            if self.txn:
+                self.txn.__exit__(exc_type, exc_val, exc_tb)
+                self.txn = None
+
+    def __call__(self, func):
+        @wraps(func)
+        def magic(*args, **kwargs):
+            with self:
+                return func(*args, **kwargs)
+
+        return magic
+
+
 class DatabaseLock(Enum):
     MYSQL = MysqlDatabaseLock
     OCEANBASE = MysqlDatabaseLock
     POSTGRES = PostgresDatabaseLock
+    DAMENG = DamengDatabaseLock
 
 
 DB = BaseDataBase().database_connection
@@ -1303,11 +1422,11 @@ def alter_db_add_column(migrator, table_name, column_name, column_type):
         migrate(migrator.add_column(table_name, column_name, column_type))
     except OperationalError as ex:
         error_codes = [1060]
-        error_messages = ['Duplicate column name']
+        error_messages = ['Duplicate column name', 'already exists', 'column exists', '列已存在', '对象已存在']
 
         should_skip_error = (
                 (hasattr(ex, 'args') and ex.args and ex.args[0] in error_codes) or
-                (str(ex) in error_messages)
+                any(msg.lower() in str(ex).lower() for msg in error_messages)
         )
 
         if not should_skip_error:

@@ -13,6 +13,20 @@ mysql:
   max_connections: 900
   stale_timeout: 300
   max_allowed_packet: ${MYSQL_MAX_PACKET:-1073741824}
+dameng:
+  name: '${DM_DBNAME:-RAG_FLOW}'
+  user: '${DM_USER:-SYSDBA}'
+  password: '${DM_PASSWORD:-Dameng123456}'
+  host: '${DM_HOST:-172.20.142.35}'
+  port: ${DM_PORT:-5601}
+  schema: '${DM_SCHEMA:-SYSDBA}'
+  driver: '${DM_DRIVER:-dmpython}'
+  # JDBC-specific options (used when driver=jdbc or driver=auto on macOS):
+  # jdbc_driver_class: '${DM_JDBC_DRIVER_CLASS:-dm.jdbc.driver.DmDriver}'
+  # jdbc_jar: '${DM_JDBC_JAR:-}'  # path to DmJdbcDriver JAR; auto-detected from .drivers/dameng/jdbc/ if empty
+  # jdbc_url: '${DM_JDBC_URL:-}'   # full JDBC URL; auto-generated from host/port if empty
+  max_connections: 100
+  stale_timeout: 300
 minio:
   user: '${MINIO_USER:-rag_flow}'
   password: '${MINIO_PASSWORD:-infini_rag_flow}'

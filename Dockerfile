@@ -202,6 +202,7 @@ COPY pyproject.toml uv.lock ./
 COPY mcp mcp
 COPY common common
 COPY memory memory
+COPY .drivers/dameng/jdbc /ragflow/.drivers/dameng/jdbc
 
 COPY docker/service_conf.yaml.template ./conf/service_conf.yaml.template
 COPY docker/entrypoint.sh ./
