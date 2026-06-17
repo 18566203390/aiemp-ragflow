@@ -23,12 +23,13 @@ import time
 import typing
 from datetime import datetime, timezone
 from enum import Enum
+from copy import copy
 from functools import wraps
 
 from quart_auth import AuthUser
 from itsdangerous.url_safe import URLSafeTimedSerializer as Serializer
-from peewee import InterfaceError, OperationalError, BigIntegerField, BooleanField, CharField, CompositeKey, DateTimeField, Field, FloatField, IntegerField, Metadata, Model, TextField
-from playhouse.migrate import MySQLMigrator, PostgresqlMigrator, migrate
+from peewee import Entity, InterfaceError, OperationalError, BigIntegerField, BooleanField, CharField, CompositeKey, DateTimeField, Field, FloatField, IntegerField, Metadata, Model, TextField
+from playhouse.migrate import MySQLMigrator, PostgresqlMigrator, SchemaMigrator, migrate, operation
 from playhouse.pool import PooledMySQLDatabase, PooledPostgresqlDatabase
 
 from api import utils
@@ -477,7 +478,7 @@ class RetryingPooledDamengDatabase(PooledDamengDatabase):
             try:
                 return super().execute_sql(sql, params, commit)
             except (OperationalError, InterfaceError) as e:
-                error_messages = ["connection", "closed", "broken pipe", "lost"]
+                error_messages = ["connection", "closed", "broken pipe", "lost", "not connected"]
                 should_retry = any(msg in str(e).lower() for msg in error_messages)
                 if should_retry and attempt < self.max_retries:
                     logging.warning(
@@ -492,16 +493,24 @@ class RetryingPooledDamengDatabase(PooledDamengDatabase):
 
     def _handle_connection_loss(self):
         try:
-            self.close()
+            if not self.is_closed():
+                try:
+                    self.rollback()
+                except Exception:
+                    pass
+                if hasattr(self, "manual_close"):
+                    self.manual_close()
+                else:
+                    self.close()
         except Exception:
             pass
         try:
-            self.connect()
+            self.connect(reuse_if_open=True)
         except Exception as e:
             logging.error(f"Failed to reconnect to Dameng: {e}")
             time.sleep(0.1)
             try:
-                self.connect()
+                self.connect(reuse_if_open=True)
             except Exception as e2:
                 logging.error(f"Failed to reconnect to Dameng on second attempt: {e2}")
                 raise
@@ -511,7 +520,7 @@ class RetryingPooledDamengDatabase(PooledDamengDatabase):
             try:
                 return super().begin()
             except (OperationalError, InterfaceError) as e:
-                error_messages = ["connection", "closed", "broken pipe", "lost"]
+                error_messages = ["connection", "closed", "broken pipe", "lost", "not connected"]
                 should_retry = any(msg in str(e).lower() for msg in error_messages)
                 if should_retry and attempt < self.max_retries:
                     logging.warning(
@@ -522,6 +531,33 @@ class RetryingPooledDamengDatabase(PooledDamengDatabase):
                 else:
                     raise
         return None
+
+
+class DamengMigrator(SchemaMigrator):
+    @operation
+    def add_column(self, table, column_name, field):
+        # DaMeng is permissive enough for nullable additive migrations. Keeping
+        # added columns nullable avoids MySQL/Postgres-specific NOT NULL DDL.
+        field = copy(field)
+        field.null = True
+        operations = [self.alter_add_column(table, column_name, field)]
+
+        if field.index or field.unique:
+            using = getattr(field, "index_type", None)
+            operations.append(self.add_index(table, (column_name,), field.unique, using))
+        return operations
+
+    @operation
+    def alter_column_type(self, table, column, field, cast=None):
+        if field.column_name != column:
+            field.name = field.column_name = column
+        return (
+            self._alter_table(self.make_context(), table)
+            .literal(" MODIFY ")
+            .sql(Entity(column))
+            .literal(" ")
+            .sql(field.ddl_datatype(self.make_context()))
+        )
 
 
 class PooledDatabase(Enum):
@@ -535,7 +571,7 @@ class DatabaseMigrator(Enum):
     MYSQL = MySQLMigrator
     OCEANBASE = MySQLMigrator
     POSTGRES = PostgresqlMigrator
-    DAMENG = MySQLMigrator
+    DAMENG = DamengMigrator
 
 
 @singleton
@@ -700,27 +736,41 @@ class DamengDatabaseLock:
 
     @with_retry(max_retries=3, retry_delay=1.0)
     def lock(self):
-        self.db.execute_sql(
-            "CREATE TABLE IF NOT EXISTS ragflow_db_lock "
-            "(lock_name VARCHAR(128) PRIMARY KEY, update_time BIGINT)"
-        )
+        if not self.db.table_exists("ragflow_db_lock"):
+            try:
+                self.db.execute_sql(
+                    "CREATE TABLE ragflow_db_lock "
+                    "(lock_name VARCHAR(128) PRIMARY KEY, update_time BIGINT)"
+                )
+            except Exception as exc:
+                if not self.db.table_exists("ragflow_db_lock"):
+                    raise exc
         self.txn = self.db.atomic()
         self.txn.__enter__()
         try:
-            self.db.execute_sql(
-                "INSERT INTO ragflow_db_lock(lock_name, update_time) VALUES(?, ?)",
-                (self.lock_name, current_timestamp()),
+            try:
+                self.db.execute_sql(
+                    "INSERT INTO ragflow_db_lock(lock_name, update_time) VALUES(?, ?)",
+                    (self.lock_name, current_timestamp()),
+                )
+            except Exception as exc:
+                if not any(token in str(exc).lower() for token in ["duplicate", "unique", "重复", "唯一", "已存在"]):
+                    raise
+
+            wait_clause = "NOWAIT" if self.timeout <= 0 else f"WAIT {self.timeout}"
+            cursor = self.db.execute_sql(
+                f"SELECT lock_name FROM ragflow_db_lock WHERE lock_name = ? FOR UPDATE {wait_clause}",
+                (self.lock_name,),
             )
+            ret = cursor.fetchone()
+            if not ret:
+                raise Exception(f"failed to acquire dameng lock {self.lock_name}")
+            return True
         except Exception:
-            pass
-        cursor = self.db.execute_sql(
-            "SELECT lock_name FROM ragflow_db_lock WHERE lock_name = ? FOR UPDATE",
-            (self.lock_name,),
-        )
-        ret = cursor.fetchone()
-        if not ret:
-            raise Exception(f"failed to acquire dameng lock {self.lock_name}")
-        return True
+            if self.txn:
+                self.txn.__exit__(*sys.exc_info())
+                self.txn = None
+            raise
 
     def unlock(self):
         if self.txn:
@@ -1421,8 +1471,8 @@ def alter_db_add_column(migrator, table_name, column_name, column_type):
     try:
         migrate(migrator.add_column(table_name, column_name, column_type))
     except OperationalError as ex:
-        error_codes = [1060]
-        error_messages = ['Duplicate column name', 'already exists', 'column exists', '列已存在', '对象已存在']
+        error_codes = [1060, -2116]
+        error_messages = ["Duplicate column name", "already exists", "column exists", "已存在"]
 
         should_skip_error = (
                 (hasattr(ex, 'args') and ex.args and ex.args[0] in error_codes) or
@@ -1433,7 +1483,9 @@ def alter_db_add_column(migrator, table_name, column_name, column_type):
             logging.critical(f"Failed to add {settings.DATABASE_TYPE.upper()}.{table_name} column {column_name}, operation error: {ex}")
 
     except Exception as ex:
-        logging.critical(f"Failed to add {settings.DATABASE_TYPE.upper()}.{table_name} column {column_name}, error: {ex}")
+        error_messages = ["Duplicate column name", "already exists", "column exists", "已存在"]
+        if not any(msg.lower() in str(ex).lower() for msg in error_messages):
+            logging.critical(f"Failed to add {settings.DATABASE_TYPE.upper()}.{table_name} column {column_name}, error: {ex}")
         pass
 
 def alter_db_column_type(migrator, table_name, column_name, new_column_type):

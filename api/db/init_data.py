@@ -21,6 +21,8 @@ import time
 import uuid
 from copy import deepcopy
 
+from peewee import SQL
+
 from api.db import UserTenantRole
 from api.db.db_models import init_database_tables as init_web_db, LLMFactories, LLM, TenantLLM
 from api.db.services import UserService
@@ -94,7 +96,7 @@ def init_superuser(nickname=DEFAULT_SUPERUSER_NICKNAME, email=DEFAULT_SUPERUSER_
 
 
 def init_llm_factory():
-    LLMFactoriesService.filter_delete([1 == 1])
+    LLMFactoriesService.filter_delete([SQL("1=1")])
     factory_llm_infos = settings.FACTORY_LLM_INFOS
     for factory_llm_info in factory_llm_infos:
         info = deepcopy(factory_llm_info)
@@ -120,7 +122,7 @@ def init_llm_factory():
     LLMService.filter_delete([LLMService.model.fid == "QAnything"])
     TenantLLMService.filter_update([TenantLLMService.model.llm_factory == "QAnything"], {"llm_factory": "Youdao"})
     TenantLLMService.filter_update([TenantLLMService.model.llm_factory == "cohere"], {"llm_factory": "Cohere"})
-    TenantService.filter_update([1 == 1], {
+    TenantService.filter_update([SQL("1=1")], {
         "parser_ids": "naive:General,qa:Q&A,resume:Resume,manual:Manual,table:Table,paper:Paper,book:Book,laws:Laws,presentation:Presentation,picture:Picture,one:One,audio:Audio,email:Email,tag:Tag"})
     ## insert openai two embedding models to the current openai user.
     # print("Start to insert 2 OpenAI embedding models...")
@@ -147,7 +149,7 @@ def init_llm_factory():
 
 def add_graph_templates():
     dir = os.path.join(get_project_base_directory(), "agent", "templates")
-    CanvasTemplateService.filter_delete([1 == 1])
+    CanvasTemplateService.filter_delete([SQL("1=1")])
     if not os.path.exists(dir):
         logging.warning("Missing agent templates!")
         return
