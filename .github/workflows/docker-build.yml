@@ -36,9 +36,11 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: ./Dockerfile
+          file: ./Dockerfile.acr
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            NEED_MIRROR=1
           tags: |
             ${{ secrets.ACR_REGISTRY }}/longlong_wu/aiemp-ragflow:aiepm-ragflow
           cache-from: type=gha
