@@ -180,6 +180,10 @@ test = [
 [[tool.uv.index]]
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+
 [tool.setuptools]
 packages = [
     'agent',
