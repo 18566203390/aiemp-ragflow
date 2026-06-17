@@ -218,9 +218,14 @@ def check_oceanbase_health() -> dict:
 
 def get_mysql_status():
     try:
-        cursor = DB.execute_sql("SHOW PROCESSLIST;")
-        res_rows = cursor.fetchall()
-        headers = ['id', 'user', 'host', 'db', 'command', 'time', 'state', 'info']
+        if settings.DATABASE_TYPE.lower() == "dameng":
+            cursor = DB.execute_sql("SELECT 1 AS ok")
+            res_rows = cursor.fetchall()
+            headers = ["ok"]
+        else:
+            cursor = DB.execute_sql("SHOW PROCESSLIST;")
+            res_rows = cursor.fetchall()
+            headers = ['id', 'user', 'host', 'db', 'command', 'time', 'state', 'info']
         cursor.close()
         return {
             "status": "alive",

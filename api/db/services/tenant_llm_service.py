@@ -207,9 +207,12 @@ class TenantLLMService(CommonService):
         llm_name, llm_factory = TenantLLMService.split_model_name_and_factory(mdlnm)
 
         try:
+            condition = (cls.model.tenant_id == tenant_id) & (cls.model.llm_name == llm_name)
+            if llm_factory:
+                condition &= cls.model.llm_factory == llm_factory
             num = (
                 cls.model.update(used_tokens=cls.model.used_tokens + used_tokens)
-                .where(cls.model.tenant_id == tenant_id, cls.model.llm_name == llm_name, cls.model.llm_factory == llm_factory if llm_factory else True)
+                .where(condition)
                 .execute()
             )
         except Exception:

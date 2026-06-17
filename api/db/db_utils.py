@@ -20,31 +20,85 @@ from playhouse.pool import PooledMySQLDatabase
 
 from common.time_utils import current_timestamp, timestamp_to_date
 
+from api.db.dameng_database import PooledDamengDatabase
 from api.db.db_models import DB, DataBaseModel
+
+
+def _is_duplicate_key_error(exc):
+    message = str(exc).lower()
+    return any(
+        token in message
+        for token in (
+            "duplicate",
+            "unique",
+            "constraint",
+            "primary key",
+            "-6602",
+            "-6603",
+        )
+    )
+
+
+def _primary_key_filter(model, row):
+    primary_key = model._meta.primary_key
+    field_names = getattr(primary_key, "field_names", None) or [primary_key.name]
+    filters = []
+    for field_name in field_names:
+        if field_name not in row:
+            raise ValueError(f"Cannot upsert {model.__name__}: missing primary key field {field_name}")
+        filters.append(getattr(model, field_name) == row[field_name])
+    return reduce(operator.iand, filters)
+
+
+def _dameng_insert_or_update(model, rows, preserve):
+    for row in rows:
+        try:
+            model.insert(row).execute()
+        except Exception as exc:
+            if not _is_duplicate_key_error(exc):
+                raise
+
+            update_data = {key: row[key] for key in preserve if key in row}
+            for key in getattr(model._meta.primary_key, "field_names", [model._meta.primary_key.name]):
+                update_data.pop(key, None)
+            if update_data:
+                model.update(update_data).where(_primary_key_filter(model, row)).execute()
 
 
 @DB.connection_context()
 def bulk_insert_into_db(model, data_source, replace_on_conflict=False):
+    if not data_source:
+        return
+
     DB.create_tables([model])
 
     for i, data in enumerate(data_source):
         current_time = current_timestamp() + i
         current_date = timestamp_to_date(current_time)
-        if 'create_time' not in data:
-            data['create_time'] = current_time
-        data['create_date'] = timestamp_to_date(data['create_time'])
-        data['update_time'] = current_time
-        data['update_date'] = current_date
+        if "create_time" not in data:
+            data["create_time"] = current_time
+        data["create_date"] = timestamp_to_date(data["create_time"])
+        data["update_time"] = current_time
+        data["update_date"] = current_date
 
-    preserve = tuple(data_source[0].keys() - {'create_time', 'create_date'})
+    preserve = tuple(data_source[0].keys() - {"create_time", "create_date"})
 
     batch_size = 1000
 
     for i in range(0, len(data_source), batch_size):
         with DB.atomic():
-            query = model.insert_many(data_source[i:i + batch_size])
+            rows = data_source[i:i + batch_size]
+            query = model.insert_many(rows)
             if replace_on_conflict:
-                if isinstance(DB, PooledMySQLDatabase):
+                if isinstance(DB, PooledDamengDatabase):
+                    try:
+                        query.execute()
+                    except Exception as exc:
+                        if not _is_duplicate_key_error(exc):
+                            raise
+                        _dameng_insert_or_update(model, rows, preserve)
+                    continue
+                elif isinstance(DB, PooledMySQLDatabase):
                     query = query.on_conflict(preserve=preserve)
                 else:
                     query = query.on_conflict(conflict_target="id", preserve=preserve)
