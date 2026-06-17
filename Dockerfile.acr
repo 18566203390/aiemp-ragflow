@@ -1,5 +1,5 @@
 # base stage
-FROM --platform=$BUILDPLATFORM crpi-dhnt865lguyhup2r.cn-hangzhou.personal.cr.aliyuncs.com/longlong_wu/ragflow_deps:latest AS ragflow_deps
+FROM --platform=$BUILDPLATFORM infiniflow/ragflow_deps:latest AS ragflow_deps
 
 FROM ubuntu:24.04 AS base
 USER root
