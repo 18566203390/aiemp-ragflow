@@ -1000,9 +1000,9 @@ wheels = [
 name = "chardet"
 version = "5.2.0"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
-sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/f3/0d/f7b6ab21ec75897ed80c17d79b15951a719226b9fababf1e40ea74d69079/chardet-5.2.0.tar.gz", hash = "sha256:1b3b6ff479a8c414bc3fa2c0852995695c4a026dcd6d0633b2dd092ca39c1cf7" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/f3/0d/f7b6ab21ec75897ed80c17d79b15951a719226b9fababf1e40ea74d69079/chardet-5.2.0.tar.gz", hash = "sha256:1b3b6ff479a8c414bc3fa2c0852995695c4a026dcd6d0633b2dd092ca39c1cf7", size = 2069618, upload-time = "2023-08-01T19:23:02.662Z" }
 wheels = [
-    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/38/6f/f5fbc992a329ee4e0f288c1fe0e2ad9485ed064cac731ed2fe47dcc38cbf/chardet-5.2.0-py3-none-any.whl", hash = "sha256:e1cf59446890a00105fe7b7912492ea04b6e6f06d4b742b2c788469e34c82970" },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/38/6f/f5fbc992a329ee4e0f288c1fe0e2ad9485ed064cac731ed2fe47dcc38cbf/chardet-5.2.0-py3-none-any.whl", hash = "sha256:e1cf59446890a00105fe7b7912492ea04b6e6f06d4b742b2c788469e34c82970", size = 199385, upload-time = "2023-08-01T19:23:00.661Z" },
 ]
 
 [[package]]
@@ -1661,6 +1661,24 @@ source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
 sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/fc/f8/98eea607f65de6527f8a2e8885fc8015d3e6f5775df186e443e0964a11c3/distro-1.9.0.tar.gz", hash = "sha256:2fa77c6fd8940f116ee1d6b94a2f90b13b5ea8d019b98bc8bafdcabcdd9bdbed", size = 60722, upload-time = "2023-12-24T09:54:32.31Z" }
 wheels = [
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/12/b3/231ffd4ab1fc9d679809f356cebee130ac7daa00d6d6f3206dd4fd137e9e/distro-1.9.0-py3-none-any.whl", hash = "sha256:7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2", size = 20277, upload-time = "2023-12-24T09:54:30.421Z" },
+]
+
+[[package]]
+name = "dmpython"
+version = "2.5.32"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/06/a5/82cf0dfd483ef78e7523781ea95892ac921202a355cf158ce1ce72a956ab/dmpython-2.5.32-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:2fbc9602106ec8d894f10d93205d41b4dcfdbc3f67c4d7b5e45452bceea9f7bc", size = 11574161, upload-time = "2026-04-13T09:34:22.702Z" },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/21/2c/d9f0f6c39834d73e89ff7e79aa92e677f4e4bea9c07dda917e2e3ad933bd/dmpython-2.5.32-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:bca8530ee0602c8bb4609a3b502cee01025642dbe873acdecc1f249318180ba9", size = 10881618, upload-time = "2026-04-13T09:04:20.903Z" },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/d2/7b/9a1997e4db3e32c38a332229b5961f1b5f4bec406c959bf8cbc1fab4992f/dmpython-2.5.32-cp312-cp312-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:cdeb42cb6f88b46c35dcf9d295c3c8ffe48a8b6f5713dee3fcc3e8cdd7b572ab", size = 10883883, upload-time = "2026-04-13T09:04:48.267Z" },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/3c/61/fee9c3f631dec012034b5a1ef1ee624b0a44740186d2efa23861db252f80/dmpython-2.5.32-cp312-cp312-win_amd64.whl", hash = "sha256:668da85d874aba561b6c0d6dde183ec294411967d64d671e69e41fb6d5523c39", size = 8670510, upload-time = "2026-04-13T09:25:54.738Z" },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/35/c2/389b89c94a75323034bfd5ec345d699e8c30599f75b030a6f4d67b0460b2/dmpython-2.5.32-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:0a2b902e3d23dd1cd70e29a751adffe04ada5f0001dfb51f876a0367bf0eb125", size = 11573666, upload-time = "2026-04-13T09:34:59.585Z" },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/e3/84/39cc41871d6ef72c2c3ee958e085916dc30bc7662b34bb09e57d5a2c2f59/dmpython-2.5.32-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:84c47b410d035d9432e9732c8f885435e8b04bb66b0ec7f8f86b4779f69aadbb", size = 10876679, upload-time = "2026-04-13T09:05:19.211Z" },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/88/93/9b53fc5903f019692a35c78f5b0f4878a6aa74fdf1d117986051821436d9/dmpython-2.5.32-cp313-cp313-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:719d250e79691d5448b27e05d63cb2f39e4c32c6f7c990f01807b20263b9c13a", size = 10875186, upload-time = "2026-04-13T09:05:46.581Z" },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/0d/ec/4f97d6a5fad7aba22e35f3f4ec078d2d85811239a22dd93f7e32bda15873/dmpython-2.5.32-cp313-cp313-win_amd64.whl", hash = "sha256:50c3c911be37af2a6cb05dc6e39ada6ef4d51a63f96a7ac9c8e877c929bbb34a", size = 8670506, upload-time = "2026-04-13T09:26:18.223Z" },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/13/4e/804176a7059e5f0c3b3b2196d7f23a4b09c28514f4b491428d7e38364262/dmpython-2.5.32-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:4bde0e3b32b011cd1573f941e7680acebd2dda206962603373cff082aa3197d0", size = 11575994, upload-time = "2026-04-13T09:35:36.915Z" },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/0e/53/c7d89a1f73289fef39eb82bab230a1a976d03277d031bf2320d87e4055e2/dmpython-2.5.32-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:2d54c3b0daf9e3196bc7a85d1d1237a5e897fe5153cfaf9734b116c922e9dc82", size = 10876690, upload-time = "2026-04-13T09:06:13.867Z" },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/4f/38/eb0c774a826b2feff3096bcb24942ac45a92fcdb18dd35c80200a6cebc68/dmpython-2.5.32-cp314-cp314-win_amd64.whl", hash = "sha256:b0fdef9ef37fadf2d9a0548a54d58c4efafa6f59ceac0404e0a1d6a7069a45d3", size = 8670385, upload-time = "2026-04-13T09:26:41.859Z" },
 ]
 
 [[package]]
@@ -3920,15 +3938,15 @@ wheels = [
 [[package]]
 name = "mistralai"
 version = "0.4.2"
-source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "orjson" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/fa/20/4204f461588310b3a7ffbbbb7fa573493dc1c8185d376ee72516c04575bf/mistralai-0.4.2.tar.gz", hash = "sha256:5eb656710517168ae053f9847b0bb7f617eda07f1f93f946ad6c91a4d407fd93", size = 14234, upload-time = "2024-07-04T09:22:43.992Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fa/20/4204f461588310b3a7ffbbbb7fa573493dc1c8185d376ee72516c04575bf/mistralai-0.4.2.tar.gz", hash = "sha256:5eb656710517168ae053f9847b0bb7f617eda07f1f93f946ad6c91a4d407fd93", size = 14234, upload-time = "2024-07-04T09:22:43.992Z" }
 wheels = [
-    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/4f/fe/79dad76b8d94b62d9e2aab8446183190e1dc384c617d06c3c93307850e11/mistralai-0.4.2-py3-none-any.whl", hash = "sha256:63c98eea139585f0a3b2c4c6c09c453738bac3958055e6f2362d3866e96b0168", size = 20334, upload-time = "2024-07-04T09:22:42.211Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/fe/79dad76b8d94b62d9e2aab8446183190e1dc384c617d06c3c93307850e11/mistralai-0.4.2-py3-none-any.whl", hash = "sha256:63c98eea139585f0a3b2c4c6c09c453738bac3958055e6f2362d3866e96b0168", size = 20334, upload-time = "2024-07-04T09:22:42.211Z" },
 ]
 
 [[package]]
@@ -6141,6 +6159,7 @@ dependencies = [
     { name = "deepl" },
     { name = "demjson3" },
     { name = "discord-py" },
+    { name = "dmpython", marker = "sys_platform != 'darwin'" },
     { name = "dropbox" },
     { name = "duckduckgo-search" },
     { name = "editdistance" },
@@ -6277,6 +6296,7 @@ requires-dist = [
     { name = "deepl", specifier = "==1.18.0" },
     { name = "demjson3", specifier = "==3.0.6" },
     { name = "discord-py", specifier = "==2.3.2" },
+    { name = "dmpython", marker = "sys_platform != 'darwin'", specifier = ">=2.5.32,<3.0.0" },
     { name = "dropbox", specifier = "==12.0.2" },
     { name = "duckduckgo-search", specifier = ">=7.2.0,<8.0.0" },
     { name = "editdistance", specifier = "==0.8.1" },
