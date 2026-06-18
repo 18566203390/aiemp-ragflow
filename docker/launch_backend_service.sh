@@ -39,9 +39,20 @@ case "$(uname -m)" in
     SYSTEM_LIB_DIR=""
     ;;
 esac
-if [ -n "${SYSTEM_LIB_DIR}" ] && [ -d "${SYSTEM_LIB_DIR}" ]; then
-  export LD_LIBRARY_PATH="${SYSTEM_LIB_DIR}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
-fi
+
+prepend_ld_library_path() {
+  local dir="$1"
+  if [ -n "${dir}" ] && [ -d "${dir}" ]; then
+    case ":${LD_LIBRARY_PATH:-}:" in
+      *":${dir}:"*) ;;
+      *) export LD_LIBRARY_PATH="${dir}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" ;;
+    esac
+  fi
+}
+
+prepend_ld_library_path "${SYSTEM_LIB_DIR}"
+prepend_ld_library_path "/ragflow/.venv/lib/python3.12/site-packages/dmssl"
+prepend_ld_library_path "/ragflow/.venv/lib/python3.12/site-packages/dmpython.libs"
 JEMALLOC_PATH=$(pkg-config --variable=libdir jemalloc)/libjemalloc.so
 
 PY=python3
