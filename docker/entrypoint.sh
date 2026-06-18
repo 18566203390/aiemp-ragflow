@@ -172,7 +172,20 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     fi
 done < "${TEMPLATE_FILE}"
 
-export LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu/"
+case "$(uname -m)" in
+    x86_64|amd64)
+        SYSTEM_LIB_DIR="/usr/lib/x86_64-linux-gnu"
+        ;;
+    aarch64|arm64)
+        SYSTEM_LIB_DIR="/usr/lib/aarch64-linux-gnu"
+        ;;
+    *)
+        SYSTEM_LIB_DIR=""
+        ;;
+esac
+if [ -n "${SYSTEM_LIB_DIR}" ] && [ -d "${SYSTEM_LIB_DIR}" ]; then
+    export LD_LIBRARY_PATH="${SYSTEM_LIB_DIR}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+fi
 PY=python3
 
 # -----------------------------------------------------------------------------

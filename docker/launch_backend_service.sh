@@ -28,7 +28,20 @@ load_env_file
 export http_proxy=""; export https_proxy=""; export no_proxy=""; export HTTP_PROXY=""; export HTTPS_PROXY=""; export NO_PROXY=""
 export PYTHONPATH=$(pwd)
 
-export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/
+case "$(uname -m)" in
+  x86_64|amd64)
+    SYSTEM_LIB_DIR="/usr/lib/x86_64-linux-gnu"
+    ;;
+  aarch64|arm64)
+    SYSTEM_LIB_DIR="/usr/lib/aarch64-linux-gnu"
+    ;;
+  *)
+    SYSTEM_LIB_DIR=""
+    ;;
+esac
+if [ -n "${SYSTEM_LIB_DIR}" ] && [ -d "${SYSTEM_LIB_DIR}" ]; then
+  export LD_LIBRARY_PATH="${SYSTEM_LIB_DIR}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+fi
 JEMALLOC_PATH=$(pkg-config --variable=libdir jemalloc)/libjemalloc.so
 
 PY=python3
