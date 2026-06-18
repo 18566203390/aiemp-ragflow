@@ -118,16 +118,18 @@ class SyncLogsService(CommonService):
         if connector_id:
             query = query.where(cls.model.connector_id == connector_id)
         else:
-            database_type = os.getenv("DB_TYPE", "mysql")
-            if "postgres" in database_type.lower():
-                interval_expr = SQL("make_interval(mins => t2.refresh_freq)")
+            database_type = os.getenv("DB_TYPE", "mysql").lower()
+            if "postgres" in database_type:
+                refresh_cutoff = fn.NOW() - SQL("make_interval(mins => t2.refresh_freq)")
+            elif "dameng" in database_type:
+                refresh_cutoff = SQL('DATEADD(MINUTE, - "t2"."refresh_freq", NOW())')
             else:
-                interval_expr = SQL("INTERVAL `t2`.`refresh_freq` MINUTE")
+                refresh_cutoff = fn.NOW() - SQL("INTERVAL `t2`.`refresh_freq` MINUTE")
             query = query.where(
                 Connector.input_type == InputType.POLL,
                 Connector.status == TaskStatus.SCHEDULE,
                 cls.model.status == TaskStatus.SCHEDULE,
-                cls.model.update_date < (fn.NOW() - interval_expr)
+                cls.model.update_date < refresh_cutoff
             )
 
         query = query.distinct().order_by(cls.model.update_time.desc())
@@ -298,6 +300,5 @@ class Connector2KbService(CommonService):
                         cls.model.kb_id==kb_id
                     ).dicts()
         )
-
 
 
