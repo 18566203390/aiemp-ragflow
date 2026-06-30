@@ -481,6 +481,7 @@ def _load_doc_module(monkeypatch, module_basename="chunk_api"):
     tenant_model_service_mod.get_model_config_by_id = _get_model_config_by_id
     tenant_model_service_mod.get_model_config_from_provider_instance = _get_model_config_from_provider_instance
     tenant_model_service_mod.get_tenant_default_model_by_type = _get_tenant_default_model_by_type
+    tenant_model_service_mod.split_model_name = lambda model_name: (model_name.split("@")[0], "", model_name.split("@")[-1] if "@" in model_name else "")
     monkeypatch.setitem(sys.modules, "api.db.joint_services.tenant_model_service", tenant_model_service_mod)
 
     if module_basename == "document_api":
@@ -1187,3 +1188,126 @@ class TestDocRoutesUnit:
         res = _run(module.retrieval_test.__wrapped__("tenant-1"))
         assert res["code"] == module.RetCode.DATA_ERROR
         assert "No chunk found! Check the chunk status please!" in res["message"]
+
+    def test_retrieval_uses_caller_tenant_models_for_shared_dataset(self, monkeypatch):
+        module = _load_doc_module(monkeypatch)
+        caller_tenant_id = "caller-tenant"
+        dataset_owner_tenant_id = "owner-tenant"
+        kb = SimpleNamespace(
+            tenant_id=dataset_owner_tenant_id,
+            embd_id="embed-model@provider",
+            tenant_embd_id=1,
+        )
+        model_config_calls = []
+        bundle_tenant_ids = []
+        feature_tenant_ids = {}
+
+        monkeypatch.setattr(
+            module,
+            "get_request_json",
+            lambda: _AwaitableValue(
+                {
+                    "dataset_ids": ["ds-1"],
+                    "question": "q",
+                    "rerank_id": "rerank-model@provider",
+                    "cross_languages": ["en"],
+                    "keyword": True,
+                    "toc_enhance": True,
+                    "use_kg": True,
+                }
+            ),
+        )
+        monkeypatch.setattr(module.KnowledgebaseService, "accessible", lambda **_kwargs: True)
+        monkeypatch.setattr(module.KnowledgebaseService, "get_by_ids", lambda _ids: [kb])
+        monkeypatch.setattr(module.KnowledgebaseService, "get_by_id", lambda _id: (True, kb))
+
+        def _get_billing_model_config(tenant_id, model_type, model_name):
+            model_config_calls.append((tenant_id, model_type, model_name))
+            return {
+                "llm_factory": "MockFactory",
+                "api_key": f"key-for-{tenant_id}",
+                "api_base": "",
+                "llm_name": model_name,
+                "model_type": getattr(model_type, "value", model_type),
+                "max_tokens": 8192,
+            }
+
+        def _get_tenant_default_model_by_type(tenant_id, model_type):
+            model_config_calls.append((tenant_id, model_type, "default"))
+            return {
+                "llm_factory": "MockFactory",
+                "api_key": f"key-for-{tenant_id}",
+                "api_base": "",
+                "llm_name": "default-chat",
+                "model_type": getattr(model_type, "value", model_type),
+                "max_tokens": 8192,
+            }
+
+        def _llm_bundle(tenant_id, model_config, **_kwargs):
+            bundle_tenant_ids.append(tenant_id)
+            return SimpleNamespace(tenant_id=tenant_id, model_config=model_config)
+
+        async def _cross_languages(tenant_id, _dialog, question, langs):
+            feature_tenant_ids["cross_languages"] = tenant_id
+            assert langs == ["en"]
+            return f"{question}-xl"
+
+        async def _keyword_extraction(chat_mdl, question):
+            feature_tenant_ids["keyword"] = chat_mdl.tenant_id
+            return "-kw"
+
+        class _Retriever:
+            async def retrieval(self, question, embd_mdl, tenant_ids, *_args, **_kwargs):
+                feature_tenant_ids["retrieval_embedding"] = embd_mdl.tenant_id
+                assert question == "q-xl-kw"
+                assert tenant_ids == [dataset_owner_tenant_id]
+                return {
+                    "chunks": [
+                        {
+                            "chunk_id": "c1",
+                            "content_with_weight": "content",
+                            "doc_id": "doc-1",
+                            "kb_id": "ds-1",
+                        }
+                    ],
+                    "total": 1,
+                }
+
+            async def retrieval_by_toc(self, _question, chunks, tenant_ids, chat_mdl, _size):
+                feature_tenant_ids["toc"] = chat_mdl.tenant_id
+                assert chunks and tenant_ids == [dataset_owner_tenant_id]
+                return chunks
+
+            def retrieval_by_children(self, chunks, tenant_ids):
+                assert tenant_ids == [dataset_owner_tenant_id]
+                return chunks
+
+        class _KgRetriever:
+            async def retrieval(self, _question, tenant_ids, _kb_ids, embd_mdl, chat_mdl):
+                feature_tenant_ids["kg_embedding"] = embd_mdl.tenant_id
+                feature_tenant_ids["kg_chat"] = chat_mdl.tenant_id
+                assert tenant_ids == [dataset_owner_tenant_id]
+                return {"content_with_weight": ""}
+
+        monkeypatch.setattr(module, "get_billing_model_config", _get_billing_model_config)
+        monkeypatch.setattr(module, "get_tenant_default_model_by_type", _get_tenant_default_model_by_type)
+        monkeypatch.setattr(module, "LLMBundle", _llm_bundle)
+        monkeypatch.setattr(module, "cross_languages", _cross_languages)
+        monkeypatch.setattr(module, "keyword_extraction", _keyword_extraction)
+        monkeypatch.setattr(module, "label_question", lambda *_args, **_kwargs: {})
+        monkeypatch.setattr(module.settings, "retriever", _Retriever())
+        monkeypatch.setattr(module.settings, "kg_retriever", _KgRetriever())
+
+        res = _run(module.retrieval_test.__wrapped__(caller_tenant_id))
+
+        assert res["code"] == 0, res["message"]
+        assert all(call[0] == caller_tenant_id for call in model_config_calls)
+        assert bundle_tenant_ids and all(tenant_id == caller_tenant_id for tenant_id in bundle_tenant_ids)
+        assert feature_tenant_ids == {
+            "cross_languages": caller_tenant_id,
+            "keyword": caller_tenant_id,
+            "retrieval_embedding": caller_tenant_id,
+            "toc": caller_tenant_id,
+            "kg_embedding": caller_tenant_id,
+            "kg_chat": caller_tenant_id,
+        }

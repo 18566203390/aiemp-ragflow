@@ -52,6 +52,7 @@ from api.utils.reference_metadata_utils import (
     enrich_chunks_with_document_metadata,
     resolve_reference_metadata_preferences,
 )
+from api.utils.model_billing_utils import get_billing_model_config
 from common import settings
 from common.constants import LLMType, ParserType, RetCode, TaskStatus
 from common.metadata_utils import convert_conditions, meta_filter
@@ -337,19 +338,19 @@ async def retrieval_test(tenant_id):
         e, kb = KnowledgebaseService.get_by_id(kb_ids[0])
         if not e:
             return get_error_data_result(message="Dataset not found!")
-        embd_model_config = get_model_config_from_provider_instance(kb.tenant_id, LLMType.EMBEDDING, kb.embd_id)
-        embd_mdl = LLMBundle(kb.tenant_id, embd_model_config)
+        embd_model_config = get_billing_model_config(tenant_id, LLMType.EMBEDDING, kb.embd_id)
+        embd_mdl = LLMBundle(tenant_id, embd_model_config)
 
         rerank_mdl = None
         if req.get("rerank_id"):
-            rerank_model_config = get_model_config_from_provider_instance(kb.tenant_id, LLMType.RERANK, req["rerank_id"])
-            rerank_mdl = LLMBundle(kb.tenant_id, rerank_model_config)
+            rerank_model_config = get_billing_model_config(tenant_id, LLMType.RERANK, req["rerank_id"])
+            rerank_mdl = LLMBundle(tenant_id, rerank_model_config)
 
         if langs:
-            question = await cross_languages(kb.tenant_id, None, question, langs)
+            question = await cross_languages(tenant_id, None, question, langs)
         if req.get("keyword", False):
-            chat_model_config = get_tenant_default_model_by_type(kb.tenant_id, LLMType.CHAT)
-            question += await keyword_extraction(LLMBundle(kb.tenant_id, chat_model_config), question)
+            chat_model_config = get_tenant_default_model_by_type(tenant_id, LLMType.CHAT)
+            question += await keyword_extraction(LLMBundle(tenant_id, chat_model_config), question)
 
         ranks = await settings.retriever.retrieval(
             question, embd_mdl, tenant_ids, kb_ids, page, size, similarity_threshold,
@@ -357,14 +358,14 @@ async def retrieval_test(tenant_id):
             highlight=highlight, rank_feature=label_question(question, kbs),
         )
         if toc_enhance:
-            chat_model_config = get_tenant_default_model_by_type(kb.tenant_id, LLMType.CHAT)
-            cks = await settings.retriever.retrieval_by_toc(question, ranks["chunks"], tenant_ids, LLMBundle(kb.tenant_id, chat_model_config), size)
+            chat_model_config = get_tenant_default_model_by_type(tenant_id, LLMType.CHAT)
+            cks = await settings.retriever.retrieval_by_toc(question, ranks["chunks"], tenant_ids, LLMBundle(tenant_id, chat_model_config), size)
             if cks:
                 ranks["chunks"] = cks
         ranks["chunks"] = settings.retriever.retrieval_by_children(ranks["chunks"], tenant_ids)
         if use_kg:
-            chat_model_config = get_tenant_default_model_by_type(kb.tenant_id, LLMType.CHAT)
-            ck = await settings.kg_retriever.retrieval(question, [k.tenant_id for k in kbs], kb_ids, embd_mdl, LLMBundle(kb.tenant_id, chat_model_config))
+            chat_model_config = get_tenant_default_model_by_type(tenant_id, LLMType.CHAT)
+            ck = await settings.kg_retriever.retrieval(question, [k.tenant_id for k in kbs], kb_ids, embd_mdl, LLMBundle(tenant_id, chat_model_config))
             if ck["content_with_weight"]:
                 ranks["chunks"].insert(0, ck)
 
